@@ -22,6 +22,8 @@ options(
 
 scale_colour_discrete = scale_color_viridis_d
 scale_fill_discrete = scale_fill_viridis_d
+
+set.seed(1)
 ```
 
 
@@ -94,5 +96,113 @@ sim_results %>%
 sim_results %>% 
   ggplot(aes(x = sd)) + geom_density()
 
+```
+
+## Let's try other sample sizes.
+
+```{r}
+n_list =
+  list(
+    "n = 30" = 30,
+    "n = 60" = 60,
+    "n = 120" = 120,
+    "n = 240" = 240
+  )
+## this is the input list
+
+## want to run simulation 100 times for each
+output = vector("list", length = 4)
+
+## output[[1]] = f(input[[1]]) this is what we want conceptually
+
+output[[1]] = rerun(100, sim_mean_sd(samp_size = n_list[[1]])) %>% bind_rows()
+output[[2]] = rerun(100, sim_mean_sd(samp_size = n_list[[2]])) %>% bind_rows()
+## and so on
+
+## for loop below - this is a simulation:
+for (i in 1:4) {
+  
+  output[[i]] =
+    rerun(100, sim_mean_sd(samp_size = n_list[[i]])) %>% 
+    bind_rows()
+  
+}
+```
+
+Now try to put all of this in a process
+Use rerun functions, map functions, mutate functions - the idea is 4 sample sizes, run simulation 100x for each sample size
+
+
+```{r}
+sim_results =
+  tibble(
+    sample_size = c(30, 60, 120, 240)
+  ) %>% 
+    mutate(
+      output_lists = map(.x = sample_size, ~ rerun(10, sim_mean_sd(.x))),
+      estimate_df = map(output_lists, bind_rows)
+    ) %>% 
+    select(-output_lists) %>% 
+    unnest(estimate_df)
+
+sim_results =
+  tibble(
+    sample_size = c(30, 60, 120, 240)
+  ) %>% 
+    mutate(
+      output_lists = map(.x = sample_size, ~ rerun(1000, sim_mean_sd(.x))),
+      estimate_df = map(output_lists, bind_rows)
+    ) %>% 
+    select(-output_lists) %>% 
+    unnest(estimate_df)
+```
+
+Do some data frame things.
+
+```{r}
+sim_results %>% 
+  mutate(
+    sample_size = str_c("n =", sample_size),
+    sample_size = fct_inorder(sample_size)
+  ) %>% 
+  ggplot(aes(x = sample_size, y = mean)) +
+  geom_boxplot()
+
+sim_results %>% 
+  mutate(
+    sample_size = str_c("n =", sample_size),
+    sample_size = fct_inorder(sample_size)
+  ) %>% 
+  ggplot(aes(x = sample_size, y = mean)) +
+  geom_violin()
+
+```
+
+```{r}
+sim_results %>% 
+  group_by(sample_size) %>% 
+  summarize(
+    avg_samp_mean = mean(mean),
+    sd_samp_mean = sd(mean)
+  )
+```
+
+What if I looked at a binomial distribution??  Could repeat using binomial distribution
+
+```{r}
+sim_mean_sd = function(samp_size, mu = 3, sigma = 4) {
+  
+  sim_data =
+    tibble(
+      x = rbinom(n = samp_size, mean = mu, sd = sigma)
+  )
+
+  sim_data %>% 
+    summarize(
+      mean = mean(x),
+      sd = sd(x)
+  ) 
+  
+}
 ```
 
